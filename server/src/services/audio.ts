@@ -21,6 +21,11 @@ const USER_AGENT =
 const sourceCache = new Map<string, AudioSource>();
 const pending = new Map<string, Promise<AudioSource>>();
 
+export function clearStreamCache(): void {
+  sourceCache.clear();
+  pending.clear();
+}
+
 export function binariesAvailable(): boolean {
   return fs.existsSync(ytDlpPath) && fs.existsSync(ffmpegPath);
 }

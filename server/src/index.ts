@@ -9,6 +9,7 @@ import { libraryRouter } from './routes/library.js';
 import { musicRouter } from './routes/music.js';
 import { searchRouter } from './routes/search.js';
 import { streamRouter } from './routes/stream.js';
+import { systemRouter } from './routes/system.js';
 import { binariesAvailable } from './services/audio.js';
 import { downloadManager } from './services/downloadManager.js';
 import { warmupYoutube } from './services/youtube.js';
@@ -35,6 +36,7 @@ app.use('/api', musicRouter);
 app.use('/api', streamRouter);
 app.use('/api', libraryRouter);
 app.use('/api', downloadsRouter);
+app.use('/api', systemRouter);
 
 app.use('/api', (_req, _res, next) => {
   next(new HttpError(404, 'API route not found'));

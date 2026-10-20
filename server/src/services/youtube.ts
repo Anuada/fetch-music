@@ -152,6 +152,10 @@ export async function resolveVideoStream(
 
 const cache = new Map<string, { expires: number; value: unknown }>();
 
+export function clearYoutubeCache(): void {
+  cache.clear();
+}
+
 function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
   const hit = cache.get(key);
   if (hit && hit.expires > Date.now()) return Promise.resolve(hit.value as T);

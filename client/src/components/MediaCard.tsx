@@ -7,6 +7,7 @@ const paths: Record<Card['kind'], string> = {
   album: '/album',
   artist: '/artist',
   playlist: '/playlist',
+  podcast: '/podcast',
 };
 
 export function MediaCard({ item }: { item: Card }) {

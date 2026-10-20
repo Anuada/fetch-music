@@ -2,11 +2,13 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ListMusic,
+  Monitor,
   Music2,
   Pause,
   Play,
   Repeat,
   Repeat1,
+  RotateCcw,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -21,6 +23,7 @@ import { DownloadButton } from './DownloadButton';
 import { api } from '../lib/api';
 import { formatDuration } from '../lib/format';
 import { usePlayerStore } from '../stores/player';
+import { useHistoryStore } from '../stores/history';
 import { toast } from '../stores/toast';
 
 export function PlayerBar() {
@@ -30,6 +33,7 @@ export function PlayerBar() {
   const [queueOpen, setQueueOpen] = useState(false);
   const [playbackError, setPlaybackError] = useState('');
   const [waiting, setWaiting] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
 
   const queue = usePlayerStore((state) => state.queue);
   const currentIndex = usePlayerStore((state) => state.currentIndex);
@@ -49,6 +53,7 @@ export function PlayerBar() {
   const toggleMute = usePlayerStore((state) => state.toggleMute);
   const toggleShuffle = usePlayerStore((state) => state.toggleShuffle);
   const cycleRepeat = usePlayerStore((state) => state.cycleRepeat);
+  const addHistoryEntry = useHistoryStore((state) => state.addEntry);
 
   const currentId = current?.id;
 
@@ -98,10 +103,13 @@ export function PlayerBar() {
   useEffect(() => {
     if (!current) return;
     const timer = window.setTimeout(() => {
-      void api.recordHistory(current, 0).catch(() => undefined);
+      void api.recordHistory(current, progress).catch(() => undefined);
+      if (current.type === 'episode') {
+        addHistoryEntry({ ...current, playedAt: new Date().toISOString(), position: progress, episodeProgress: progress });
+      }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [currentId, current]);
+  }, [currentId, current, progress, addHistoryEntry]);
 
   useEffect(() => {
     if (!currentId) return;
@@ -273,6 +281,16 @@ export function PlayerBar() {
         <div className="player-side">
           <AddToPlaylistButton track={current} />
           <DownloadButton track={current} />
+          {current.type === 'video' && (
+            <button
+              className="icon-button"
+              onClick={() => window.open(`/video/${encodeURIComponent(current.id)}`, '_blank')}
+              title="Play video"
+              aria-label="Play video"
+            >
+              <Monitor size={18} />
+            </button>
+          )}
           <button
             className={`icon-button ${queueOpen ? 'active' : ''}`}
             onClick={() => setQueueOpen((value) => !value)}
@@ -306,6 +324,25 @@ export function PlayerBar() {
               <h2>{queue.length} tracks</h2>
             </div>
             <div className="queue-head-actions">
+              <button
+                className="icon-button"
+                onClick={async () => {
+                  setClearingCache(true);
+                  try {
+                    await api.clearCache();
+                    toast('Caches cleared', 'success');
+                  } catch {
+                    toast('Failed to clear caches', 'error');
+                  } finally {
+                    setClearingCache(false);
+                  }
+                }}
+                title="Clear server caches (search, streams)"
+                aria-label="Clear server caches"
+                disabled={clearingCache}
+              >
+                <RotateCcw size={17} className={clearingCache ? 'spin' : ''} />
+              </button>
               <button className="icon-button" onClick={clearQueue} title="Clear queue" aria-label="Clear queue">
                 <Trash2 size={17} />
               </button>

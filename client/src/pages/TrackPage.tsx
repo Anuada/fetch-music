@@ -1,6 +1,6 @@
 ﻿import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ListMusic, Play, Sparkles } from 'lucide-react';
+import { ListMusic, Play, Sparkles, Monitor } from 'lucide-react';
 import { AddToPlaylistButton } from '../components/AddToPlaylistButton';
 import { DetailHeader } from '../components/DetailHeader';
 import { DownloadButton } from '../components/DownloadButton';
@@ -70,8 +70,14 @@ export function TrackPage() {
               <ListMusic size={17} />
               Play next
             </button>
-            <AddToPlaylistButton track={track} />
+<AddToPlaylistButton track={track} />
             <DownloadButton track={track} />
+            {track.type === 'video' && (
+              <Link to={`/video/${encodeURIComponent(track.id)}`} className="button">
+                <Monitor size={17} />
+                Watch video
+              </Link>
+            )}
           </>
         }
       />

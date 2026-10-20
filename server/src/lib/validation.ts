@@ -23,7 +23,7 @@ export const categoryIdSchema = z
   .max(200)
   .regex(/^[A-Za-z0-9_%=-]+$/, 'Invalid category id');
 
-export const podcastIdSchema = z.string().regex(/^MPSP[A-Za-z0-9_-]{6,120}$/, 'Invalid podcast id');
+export const podcastIdSchema = z.string().min(6).max(160).regex(/^[A-Za-z0-9_-]+$/, 'Invalid podcast id');
 
 export const videoQualitySchema = z.enum(['360p', '480p', '720p', '1080p']);
 

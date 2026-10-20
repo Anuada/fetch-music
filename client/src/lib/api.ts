@@ -8,6 +8,7 @@ import type {
   Playlist,
   PlaylistDetail,
   PlaylistWithTracks,
+  PodcastDetail,
   SearchFilter,
   SearchResult,
   Shelf,
@@ -71,6 +72,7 @@ export const api = {
   album: (id: string) => request<AlbumDetail>(`/api/album/${encodeURIComponent(id)}`),
   artist: (id: string) => request<ArtistDetail>(`/api/artist/${encodeURIComponent(id)}`),
   playlist: (id: string) => request<PlaylistDetail>(`/api/playlist/${encodeURIComponent(id)}`),
+  podcast: (id: string) => request<PodcastDetail>(`/api/podcast/${encodeURIComponent(id)}`),
   track: (id: string) => request<TrackDetail>(`/api/track/${encodeURIComponent(id)}`),
 
   playlists: () => request<{ playlists: Playlist[] }>('/api/library/playlists'),
@@ -111,6 +113,8 @@ export const api = {
     request<void>(`/api/downloads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   downloadFileUrl: (id: string) => `/api/downloads/${encodeURIComponent(id)}/file`,
   streamUrl: (videoId: string) => `/api/stream/${encodeURIComponent(videoId)}`,
+  videoStreamUrl: (videoId: string, quality = '720p') => `/api/stream/${encodeURIComponent(videoId)}/video?q=${encodeURIComponent(quality)}`,
+  clearCache: () => request<{ ok: boolean; message: string }>('/api/system/clear-cache', { method: 'POST' }),
   prefetchStream,
 };
 

@@ -1,4 +1,4 @@
-export type TrackKind = 'song' | 'video';
+export type TrackKind = 'song' | 'video' | 'episode';
 
 export interface Track {
   kind: 'track';
@@ -11,7 +11,7 @@ export interface Track {
   type: TrackKind;
 }
 
-export type CardKind = 'album' | 'artist' | 'playlist';
+export type CardKind = 'album' | 'artist' | 'playlist' | 'podcast';
 
 export interface Card {
   kind: CardKind;
@@ -30,13 +30,14 @@ export interface Shelf {
   items: MediaItem[];
 }
 
-export type SearchFilter = 'song' | 'video' | 'album' | 'artist' | 'playlist';
+export type SearchFilter = 'all' | 'song' | 'video' | 'album' | 'artist' | 'playlist' | 'podcast' | 'episode';
 
 export interface SearchResult {
   query: string;
   filter: SearchFilter;
   tracks: Track[];
   cards: Card[];
+  top?: MediaItem | null;
 }
 
 export interface AlbumDetail {
@@ -74,7 +75,17 @@ export interface PlaylistDetail {
   tracks: Track[];
 }
 
-export type CollectionDetail = AlbumDetail | ArtistDetail | PlaylistDetail;
+export interface PodcastDetail {
+  kind: 'podcast';
+  id: string;
+  title: string;
+  author: string;
+  description: string;
+  thumbnail: string;
+  episodes: Track[];
+}
+
+export type CollectionDetail = AlbumDetail | ArtistDetail | PlaylistDetail | PodcastDetail;
 
 export interface TrackDetail {
   track: Track;
@@ -99,6 +110,7 @@ export interface PlaylistWithTracks extends Playlist {
 export interface HistoryEntry extends Track {
   playedAt: string;
   position: number;
+  episodeProgress?: number;
 }
 
 export type DownloadStatus = 'queued' | 'downloading' | 'completed' | 'failed' | 'cancelled';
