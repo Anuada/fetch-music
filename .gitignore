@@ -1,6 +1,1 @@
 node_modules/
-data/
-server/bin/
-*.log
-.env
-.DS_Store
