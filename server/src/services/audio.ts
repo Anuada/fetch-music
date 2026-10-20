@@ -5,13 +5,14 @@ import { Readable } from 'node:stream';
 import type { Request, Response } from 'express';
 import { binDir, downloadsDir, ffmpegPath, ytDlpPath } from '../config.js';
 import { HttpError } from '../lib/http.js';
-import { resolveAudioStream } from './youtube.js';
+import { resolveAudioStream, resolveVideoStream, type VideoQuality } from './youtube.js';
 
 const execFileAsync = promisify(execFile);
 
 interface AudioSource {
   url: string;
   expires: number;
+  quality?: string;
 }
 
 const USER_AGENT =
@@ -30,7 +31,7 @@ export function assertBinaries(): void {
   }
 }
 
-async function resolveWithYtDlp(videoId: string): Promise<string> {
+async function resolveWithYtDlp(videoId: string, format = 'bestaudio[ext=m4a]/bestaudio/best'): Promise<string> {
   if (!fs.existsSync(ytDlpPath)) {
     throw new HttpError(502, 'Could not resolve this track and yt-dlp is not installed.');
   }
@@ -41,7 +42,7 @@ async function resolveWithYtDlp(videoId: string): Promise<string> {
       '--no-playlist',
       '--no-check-certificates',
       '-f',
-      'bestaudio[ext=m4a]/bestaudio/best',
+      format,
       '--get-url',
       `https://www.youtube.com/watch?v=${videoId}`,
     ],
@@ -51,34 +52,62 @@ async function resolveWithYtDlp(videoId: string): Promise<string> {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .find((line) => line.startsWith('https://'));
-  if (!url) throw new HttpError(502, 'yt-dlp did not return an audio URL');
+  if (!url) throw new HttpError(502, 'yt-dlp did not return a media URL');
   return url;
 }
 
-async function resolveAudioSource(videoId: string, force = false): Promise<AudioSource> {
-  const hit = sourceCache.get(videoId);
+async function resolveCached(
+  key: string,
+  force: boolean,
+  load: () => Promise<AudioSource>,
+): Promise<AudioSource> {
+  const hit = sourceCache.get(key);
   if (!force && hit && hit.expires > Date.now()) return hit;
-  const existing = pending.get(videoId);
+  const existing = pending.get(key);
   if (existing) return existing;
 
   const task = (async () => {
-    let source: AudioSource;
-    try {
-      const stream = await resolveAudioStream(videoId);
-      source = { url: stream.url, expires: stream.expires };
-    } catch {
-      source = { url: await resolveWithYtDlp(videoId), expires: Date.now() + 25 * 60_000 };
+    const source = await load();
+    sourceCache.set(key, source);
+    if (sourceCache.size > 500) {
+      const first = sourceCache.keys().next().value;
+      if (first) sourceCache.delete(first);
     }
-    sourceCache.set(videoId, source);
     return source;
   })();
 
-  pending.set(videoId, task);
+  pending.set(key, task);
   try {
     return await task;
   } finally {
-    pending.delete(videoId);
+    pending.delete(key);
   }
+}
+
+function resolveAudioSource(videoId: string, force = false): Promise<AudioSource> {
+  return resolveCached(videoId, force, async () => {
+    try {
+      const stream = await resolveAudioStream(videoId);
+      return { url: stream.url, expires: stream.expires };
+    } catch {
+      return { url: await resolveWithYtDlp(videoId), expires: Date.now() + 25 * 60_000 };
+    }
+  });
+}
+
+function resolveVideoSource(videoId: string, quality: VideoQuality, force = false): Promise<AudioSource> {
+  return resolveCached(`${videoId}:video:${quality}`, force, async () => {
+    try {
+      return await resolveVideoStream(videoId, quality);
+    } catch {
+      const height = Number.parseInt(quality, 10);
+      const url = await resolveWithYtDlp(
+        videoId,
+        `bestvideo[ext=mp4][vcodec^=avc1][height<=${height}]/best[ext=mp4][height<=${height}]/best`,
+      );
+      return { url, expires: Date.now() + 25 * 60_000, quality };
+    }
+  });
 }
 
 export async function prefetchAudio(videoId: string): Promise<void> {
@@ -86,7 +115,25 @@ export async function prefetchAudio(videoId: string): Promise<void> {
 }
 
 export async function proxyAudio(req: Request, res: Response, videoId: string): Promise<void> {
-  let source = await resolveAudioSource(videoId);
+  await proxyMedia(req, res, (force) => resolveAudioSource(videoId, force), 'Audio');
+}
+
+export async function proxyVideo(
+  req: Request,
+  res: Response,
+  videoId: string,
+  quality: VideoQuality,
+): Promise<void> {
+  await proxyMedia(req, res, (force) => resolveVideoSource(videoId, quality, force), 'Video');
+}
+
+async function proxyMedia(
+  req: Request,
+  res: Response,
+  resolve: (force: boolean) => Promise<AudioSource>,
+  label: string,
+): Promise<void> {
+  let source = await resolve(false);
   const controller = new AbortController();
   res.on('close', () => controller.abort());
 
@@ -109,7 +156,7 @@ export async function proxyAudio(req: Request, res: Response, videoId: string): 
 
   let upstream = await requestUpstream(source);
   if (upstream.status === 403 || upstream.status === 410) {
-    source = await resolveAudioSource(videoId, true);
+    source = await resolve(true);
     upstream = await requestUpstream(source);
     if (upstream.status === 403 || upstream.status === 410) {
       upstream = await requestUpstream(source, true);
@@ -117,7 +164,7 @@ export async function proxyAudio(req: Request, res: Response, videoId: string): 
   }
 
   if (!upstream.ok && upstream.status !== 206) {
-    throw new HttpError(502, `Audio source responded with ${upstream.status}`);
+    throw new HttpError(502, `${label} source responded with ${upstream.status}`);
   }
 
   const contentRange = upstream.headers.get('content-range') ?? '';
@@ -134,6 +181,7 @@ export async function proxyAudio(req: Request, res: Response, videoId: string): 
     const value = upstream.headers.get(name);
     if (value) res.setHeader(name, value);
   }
+  if (source.quality) res.setHeader('x-media-quality', source.quality);
   res.setHeader('cache-control', 'private, max-age=3600');
 
   if (req.method === 'HEAD' || !upstream.body) {

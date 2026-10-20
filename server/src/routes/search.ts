@@ -10,11 +10,11 @@ searchRouter.get(
   asyncRoute(async (req, res) => {
     const query = String(req.query.q ?? '').trim();
     if (!query) {
-      res.json({ query: '', filter: 'song', tracks: [], cards: [] });
+      res.json({ query: '', filter: 'all', tracks: [], cards: [], top: null });
       return;
     }
     if (query.length > 200) throw new HttpError(400, 'Search query is too long');
-    const filter = parseOrThrow(searchFilterSchema, req.query.type ?? 'song');
+    const filter = parseOrThrow(searchFilterSchema, req.query.type ?? 'all');
     res.json(await searchMusic(query, filter));
   }),
 );
@@ -24,9 +24,9 @@ searchRouter.get(
   asyncRoute(async (req, res) => {
     const query = String(req.query.q ?? '').trim();
     if (!query) {
-      res.json({ suggestions: [] });
+      res.json({ suggestions: [], items: [] });
       return;
     }
-    res.json({ suggestions: await getSuggestions(query.slice(0, 200)) });
+    res.json(await getSuggestions(query.slice(0, 200)));
   }),
 );

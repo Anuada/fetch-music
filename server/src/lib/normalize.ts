@@ -76,9 +76,24 @@ export function albumOf(item: AnyRecord): string | undefined {
 }
 
 function itemKind(item: AnyRecord): Track['type'] {
-  return item?.item_type === 'video' || item?.type === 'video' || item?.item_type === 'musicVideo'
-    ? 'video'
-    : 'song';
+  const type = String(item?.item_type ?? item?.type ?? '');
+  const videoType = String(
+    item?.endpoint?.payload?.watchEndpointMusicSupportedConfigs?.watchEndpointMusicConfig?.musicVideoType ??
+      item?.overlay?.content?.endpoint?.payload?.watchEndpointMusicSupportedConfigs?.watchEndpointMusicConfig
+        ?.musicVideoType ??
+      '',
+  );
+  if (type === 'non_music_track' || type === 'podcast_episode' || videoType.includes('PODCAST_EPISODE')) {
+    return 'episode';
+  }
+  return type === 'video' || type === 'musicVideo' ? 'video' : 'song';
+}
+
+/** Episode rows look like "Feb 6, 2025 • Show name"; the show is the last segment. */
+function episodeShowOf(item: AnyRecord): string {
+  const subtitle = text(item?.subtitle ?? item?.flex_columns?.[1]?.title);
+  const parts = subtitle.split(' • ').map((part) => part.trim()).filter(Boolean);
+  return parts.at(-1) || artistOf(item);
 }
 
 export function idOf(item: AnyRecord): string {
@@ -96,16 +111,24 @@ export function asTrack(item: AnyRecord): Track | null {
   const id = idOf(item);
   const title = text(item?.title);
   if (!id || !title) return null;
+  const type = itemKind(item);
   return {
     kind: 'track',
     id,
     title,
-    artist: artistOf(item),
+    artist: type === 'episode' ? episodeShowOf(item) : artistOf(item),
     album: albumOf(item),
     duration: durationOf(item),
     thumbnail: thumbnailOf(item),
-    type: itemKind(item),
+    type,
   };
+}
+
+function pageTypeOf(item: AnyRecord): string {
+  const payload = item?.endpoint?.payload ?? item?.on_tap?.payload ?? item?.title?.endpoint?.payload;
+  return String(
+    payload?.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType ?? '',
+  );
 }
 
 export function cardKindOf(item: AnyRecord): CardKind | null {
@@ -113,12 +136,19 @@ export function cardKindOf(item: AnyRecord): CardKind | null {
   if (value === 'album') return 'album';
   if (value === 'artist') return 'artist';
   if (value === 'playlist') return 'playlist';
+  if (value === 'podcast_show' || value === 'podcast') return 'podcast';
+  const pageType = pageTypeOf(item);
+  if (pageType.includes('PODCAST_SHOW')) return 'podcast';
+  if (pageType === 'MUSIC_PAGE_TYPE_ARTIST') return 'artist';
+  if (pageType === 'MUSIC_PAGE_TYPE_ALBUM') return 'album';
+  if (pageType === 'MUSIC_PAGE_TYPE_PLAYLIST') return 'playlist';
   const subtitle = text(
     item?.subtitle ?? item?.flex_columns?.[1]?.title ?? item?.flex_columns?.[0]?.title,
   ).toLowerCase();
   if (!subtitle) return null;
   if (subtitle.startsWith('album')) return 'album';
   if (subtitle.startsWith('playlist')) return 'playlist';
+  if (subtitle.startsWith('podcast')) return 'podcast';
   if (subtitle.includes('subscriber') || subtitle.includes('artist')) return 'artist';
   return null;
 }

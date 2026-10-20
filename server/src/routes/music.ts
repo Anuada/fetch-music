@@ -1,7 +1,22 @@
 import { Router } from 'express';
 import { asyncRoute } from '../lib/http.js';
-import { collectionIdSchema, parseOrThrow, videoIdSchema } from '../lib/validation.js';
-import { getAlbum, getArtist, getHome, getPlaylist, getTrackDetail } from '../services/youtube.js';
+import {
+  categoryIdSchema,
+  collectionIdSchema,
+  parseOrThrow,
+  podcastIdSchema,
+  videoIdSchema,
+} from '../lib/validation.js';
+import {
+  getAlbum,
+  getArtist,
+  getHome,
+  getMoodCategory,
+  getMoodsAndGenres,
+  getPlaylist,
+  getPodcast,
+  getTrackDetail,
+} from '../services/youtube.js';
 
 export const musicRouter = Router();
 
@@ -9,6 +24,29 @@ musicRouter.get(
   '/home',
   asyncRoute(async (_req, res) => {
     res.json({ sections: await getHome() });
+  }),
+);
+
+musicRouter.get(
+  '/browse/genres',
+  asyncRoute(async (_req, res) => {
+    res.json({ groups: await getMoodsAndGenres() });
+  }),
+);
+
+musicRouter.get(
+  '/browse/genres/:id',
+  asyncRoute(async (req, res) => {
+    const id = parseOrThrow(categoryIdSchema, req.params.id);
+    res.json(await getMoodCategory(id));
+  }),
+);
+
+musicRouter.get(
+  '/podcast/:id',
+  asyncRoute(async (req, res) => {
+    const id = parseOrThrow(podcastIdSchema, req.params.id);
+    res.json(await getPodcast(id));
   }),
 );
 

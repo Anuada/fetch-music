@@ -131,7 +131,7 @@ function toTrack(row: TrackRow): Track {
     album: row.album ?? undefined,
     duration: row.duration,
     thumbnail: row.thumbnail,
-    type: row.type === 'video' ? 'video' : 'song',
+    type: row.type === 'video' || row.type === 'episode' ? row.type : 'song',
   };
 }
 

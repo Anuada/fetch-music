@@ -1,4 +1,4 @@
-export type TrackKind = 'song' | 'video';
+export type TrackKind = 'song' | 'video' | 'episode';
 
 export interface Track {
   kind: 'track';
@@ -11,7 +11,7 @@ export interface Track {
   type: TrackKind;
 }
 
-export type CardKind = 'album' | 'artist' | 'playlist';
+export type CardKind = 'album' | 'artist' | 'playlist' | 'podcast';
 
 export interface Card {
   kind: CardKind;
@@ -35,9 +35,51 @@ export interface SearchResult {
   filter: SearchFilter;
   tracks: Track[];
   cards: Card[];
+  /** Only populated for the `all` filter: the best match for the query. */
+  top?: MediaItem | null;
 }
 
-export type SearchFilter = 'song' | 'video' | 'album' | 'artist' | 'playlist';
+export type SearchFilter =
+  | 'all'
+  | 'song'
+  | 'video'
+  | 'album'
+  | 'artist'
+  | 'playlist'
+  | 'podcast'
+  | 'episode';
+
+export interface SuggestionResult {
+  suggestions: string[];
+  items: MediaItem[];
+}
+
+export interface BrowseCategory {
+  id: string;
+  title: string;
+  group: string;
+}
+
+export interface BrowseCategoryGroup {
+  title: string;
+  items: BrowseCategory[];
+}
+
+export interface CategoryDetail {
+  id: string;
+  title: string;
+  shelves: Shelf[];
+}
+
+export interface PodcastDetail {
+  kind: 'podcast';
+  id: string;
+  title: string;
+  author: string;
+  description: string;
+  thumbnail: string;
+  episodes: Track[];
+}
 
 export interface AlbumDetail {
   kind: 'album';
