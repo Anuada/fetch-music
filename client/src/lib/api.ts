@@ -16,8 +16,14 @@ import type {
   TrackDetail,
 } from '../types';
 
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+
+function withApiBase(path: string): string {
+  return `${API_BASE}${path}`;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(withApiBase(path), {
     ...options,
     headers: {
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),

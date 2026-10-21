@@ -16,9 +16,22 @@ import { warmupYoutube } from './services/youtube.js';
 
 const app = express();
 app.disable('x-powered-by');
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? 'http://127.0.0.1:5173,http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: ['http://127.0.0.1:5173', 'http://localhost:5173'],
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Origin not allowed: ${origin}`));
+    },
+    credentials: true,
   }),
 );
 app.use(express.json({ limit: '1mb' }));
