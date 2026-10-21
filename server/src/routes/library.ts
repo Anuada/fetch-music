@@ -105,7 +105,11 @@ libraryRouter.post(
   '/library/history',
   asyncRoute(async (req, res) => {
     const body = parseOrThrow(historySchema, req.body);
-    recordHistory(normalizeTrack(body.track), body.position);
+    try {
+      recordHistory(normalizeTrack(body.track), body.position);
+    } catch (error) {
+      console.error('[history] failed to record play:', error);
+    }
     res.status(204).end();
   }),
 );
