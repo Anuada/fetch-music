@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Readable } from 'node:stream';
+import path from 'node:path';
 import type { Request, Response } from 'express';
-import { binDir, downloadsDir, ffmpegPath, ytDlpPath } from '../config.js';
+import { binDir, dataDir, downloadsDir, ffmpegPath, ytDlpPath } from '../config.js';
 import { HttpError } from '../lib/http.js';
 import { resolveAudioStream, resolveVideoStream, type VideoQuality } from './youtube.js';
 
@@ -36,23 +37,44 @@ export function assertBinaries(): void {
   }
 }
 
+let cookiesFile: string | null | undefined;
+
+/**
+ * Optional YouTube cookies (Netscape cookies.txt format) from the YTDLP_COOKIES env var.
+ * Accepts raw text or base64. Needed on cloud hosts where YouTube asks to "confirm you're not a bot".
+ */
+function getCookiesFile(): string | null {
+  if (cookiesFile !== undefined) return cookiesFile;
+  const raw = process.env.YTDLP_COOKIES?.trim();
+  if (!raw) return (cookiesFile = null);
+  const text = raw.includes('\t') || raw.startsWith('#') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+  const file = path.join(dataDir, 'yt-cookies.txt');
+  fs.writeFileSync(file, text.replace(/\\n/g, '\n'));
+  return (cookiesFile = file);
+}
+
 async function resolveWithYtDlp(videoId: string, format = 'bestaudio[ext=m4a]/bestaudio/best'): Promise<string> {
   if (!fs.existsSync(ytDlpPath)) {
     throw new HttpError(502, 'Could not resolve this track and yt-dlp is not installed.');
   }
-  const { stdout } = await execFileAsync(
-    ytDlpPath,
-    [
-      '--no-warnings',
-      '--no-playlist',
-      '--no-check-certificates',
-      '-f',
-      format,
-      '--get-url',
-      `https://www.youtube.com/watch?v=${videoId}`,
-    ],
-    { timeout: 45_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true },
-  );
+  const args = ['--no-warnings', '--no-playlist', '--no-check-certificates', '-f', format, '--get-url'];
+  const cookies = getCookiesFile();
+  if (cookies) args.push('--cookies', cookies);
+  args.push(`https://www.youtube.com/watch?v=${videoId}`);
+
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync(ytDlpPath, args, {
+      timeout: 45_000,
+      maxBuffer: 8 * 1024 * 1024,
+      windowsHide: true,
+    }));
+  } catch (error) {
+    const stderr = String((error as { stderr?: string }).stderr ?? (error as Error).message ?? '');
+    const line = stderr.split(/\r?\n/).find((l) => l.includes('ERROR')) ?? stderr.trim().split(/\r?\n/).pop() ?? '';
+    console.error(`yt-dlp failed for ${videoId}:`, stderr);
+    throw new HttpError(502, `yt-dlp: ${line.replace(/^ERROR:\s*/, '').slice(0, 300) || 'failed'}`);
+  }
   const url = stdout
     .split(/\r?\n/)
     .map((line) => line.trim())
