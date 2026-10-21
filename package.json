@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "concurrently -n server,client -c red,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client && npm run typecheck -w server",
+    "build:client": "npm run build -w client",
+    "build:server": "npm run typecheck -w server",
     "start": "npm run start -w server",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
     "lint": "npm run lint -w client && npm run lint -w server",
